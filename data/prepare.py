@@ -1,5 +1,7 @@
 import os
 
+import numpy as np
+from tqdm import tqdm
 from datasets import load_dataset
 import tiktoken
 
@@ -24,6 +26,8 @@ if __name__ == '__main__':
     def tokenize(data):
         tokens = enc.encode_ordinary(data["text"])
         tokens.append(enc.eot_token)
+
+        # save both the ids and length so we can efficiently sum
         return { 'ids': tokens, 'len': len(tokens) }
 
     tokenized_data = split_dataset.map(
@@ -32,3 +36,23 @@ if __name__ == '__main__':
         desc="tokenizing the data splits",
         num_proc=num_proc
     )
+
+    # concatenate all the ids in each dataset into one large file we can use for training
+    # this part was copied from nanogpt: https://github.com/karpathy/nanoGPT/blob/master/data/openwebtext/prepare.py
+    # I obviously need to get more comfortable with numpy
+    for split, dset in tokenized_data.items():
+        arr_len = np.sum(dset['len'], dtype=np.uint64)
+        filename = os.path.join(os.path.dirname(__file__), f'{split}.bin')
+        dtype = np.uint16 # (can do since enc.max_token_value == 50256 is < 2**16)
+        arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
+        total_batches = 1024
+
+        idx = 0
+        for batch_idx in tqdm(range(total_batches), desc=f'writing {filename}'):
+            # Batch together samples for faster write
+            batch = dset.shard(num_shards=total_batches, index=batch_idx, contiguous=True).with_format('numpy')
+            arr_batch = np.concatenate(batch['ids'])
+            # Write into mmap
+            arr[idx : idx + len(arr_batch)] = arr_batch
+            idx += len(arr_batch)
+        arr.flush()

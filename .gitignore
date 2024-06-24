@@ -2,3 +2,7 @@
 bin/
 lib/
 pyvenv.cfg
+
+# tokenized train and test data
+data/train.bin
+data/test.bin
