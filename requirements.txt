@@ -20,8 +20,10 @@ pyarrow-hotfix==0.6
 python-dateutil==2.9.0.post0
 pytz==2024.1
 PyYAML==6.0.1
+regex==2024.5.15
 requests==2.32.3
 six==1.16.0
+tiktoken==0.7.0
 tqdm==4.66.4
 typing_extensions==4.12.2
 tzdata==2024.1
