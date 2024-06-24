@@ -1,0 +1,4 @@
+# python3 -m venv .
+bin/
+lib/
+pyvenv.cfg

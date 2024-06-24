@@ -5,13 +5,25 @@ in the Zero to Hero Deep Learning series. Instead of following along with the vi
 I am going to attempt to build the model from scratch by only reading the GPT-2
 and GPT-1 papers and figuring stuff out on my own.
 
-## Links
+## Setup
+
+Set up a python environment and install requirements:
+
+```
+python3 -m venv .
+source ./bin/activate
+pip3 install -r requirements.txt
+```
+
+## Build Details
+
+### Links
 
 - My iPad notes: https://www.icloud.com/notes/093qXDGpmFNV63nw9uSiGI6kA
 - GPT-2 Paper: https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf
 - GPT-1 Paper: https://s3-us-west-2.amazonaws.com/openai-assets/research-covers/language-unsupervised/language_understanding_paper.pdf
 
-## Data
+### Data
 
 GPT-2 was built off the WebText dataset. This dataset is internal to
 OpenAI, so I will be using the [OpenWebText dataset](https://paperswithcode.com/dataset/openwebtext).
@@ -29,7 +41,7 @@ Notably, the WebText dataset was scraped with the following constraints:
 OpenAI did not leverage CommonCrawl to reduce the data quality complexity they would have to surmount.
 Their main aim was to show that unsupervised learning on a large corpus could lead to meta learning on multiple tasks.
 
-## Tokenization
+### Tokenization
 
 OpenAI leveraged BPE (byte pair encoding) on top of UTF-8 unicode points
 to represent the text data. They then tokenized on sub-word groupings with
@@ -43,7 +55,7 @@ implementing and training the tokenizer from scratch. This should also allow
 me to download the open source weights and know that my model can interop with
 whatever setup OpenAI used internally.
 
-## Model Architecture
+### Model Architecture
 
 GPT-2 largely follows the GPT-1 architecture, which consists of:
 
