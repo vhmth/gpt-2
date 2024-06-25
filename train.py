@@ -14,4 +14,5 @@ TODOS:
 - run via torchrun (https://pytorch.org/docs/stable/elastic/run.html) for efficiency
 - implement checkpoints via torch.save and torch.load
 - log to wandb or neptune
+- cuda-ify everything
 """
