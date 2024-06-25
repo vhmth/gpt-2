@@ -14,7 +14,7 @@ test_data_bin = os.path.join('data', 'test.bin')
 
 # filename is a path object to either the train or test data bins
 # num_docs is the number of documents you want to read from the file
-def load_data(filename, num_docs = 1):
+def load_data_docs(filename, num_docs = 1):
     docs = [] # array of docs in token format
     current_doc = np.zeros((0,), np.uint16)
     data_offset = 0 # where we are in the file
