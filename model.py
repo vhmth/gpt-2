@@ -85,6 +85,11 @@ class GPT(nn.Module):
         super().__init__()
         self.config = config
 
+        # construct a transformer with identity + positional embeddings,
+        # dropout
+        # n_layer blocks
+        # and an ending layernorm
+
     def forward(self):
         return None, None # logits, loss
 
