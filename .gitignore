@@ -1,6 +1,7 @@
 # python3 -m venv .
 bin/
 lib/
+share/
 pyvenv.cfg
 
 # tokenized train and test data
