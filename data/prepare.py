@@ -17,8 +17,9 @@ if __name__ == '__main__':
     # shuffle the data
     # shuffle the data with a fixed seed so your test dataset is the same across training runs
     split_dataset = dataset["train"].train_test_split(test_size=0.005, shuffle=True, seed=1337)
+    split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
 
-    print(f"split the dataset into train and test: {split_dataset}")
+    print(f"\n{split_dataset}\n")
 
     # tokenize the dataset with the gpt2 encoder
     enc = tiktoken.get_encoding("gpt2")
