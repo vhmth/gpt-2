@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import tiktoken
+import torch
 
 """
 You must run ./prepare.py before leveraging these utilities to
@@ -10,7 +11,7 @@ download, split, tokenize, and save the training and test data.
 
 enc = tiktoken.get_encoding("gpt2")
 train_data_bin = os.path.join('data', 'train.bin')
-test_data_bin = os.path.join('data', 'test.bin')
+val_data_bin = os.path.join('data', 'val.bin')
 
 # filename is a path object to either the train or test data bins
 # num_docs is the number of documents you want to read from the file
@@ -40,3 +41,13 @@ def load_data_docs(filename, num_docs = 1):
                 break
     
     return docs
+
+# data_file is a path object to either the train or test data bins
+# block_size is the context length feeding into the transformer
+# batch_size is the number of examples to pull
+def get_data_batch(data_file, block_size, batch_size):
+    data_arr = np.memmap(data_file, dtype=np.uint16, mode='r')
+    batch_offsets = torch.randint(len(data_arr) - block_size, (batch_size,))
+    X = torch.stack([torch.from_numpy(data_arr[i:i+block_size]) for i in batch_offsets])
+    Y = torch.stack([torch.from_numpy(data_arr[i+1:i+1+block_size]) for i in batch_offsets])
+    return X, Y
