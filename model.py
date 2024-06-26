@@ -9,13 +9,7 @@ from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
-
-class LayerNorm(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-
-    def forward(self, x):
-        return x
+from torch.nn import functional as F
 
 class CausalSelfAttention(nn.Module):
     def __init__(self, config):
@@ -83,16 +77,47 @@ class GPTConfig:
 class GPT(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.config = config
+        self.token_embedding_table = nn.Embedding(config.vocab_size, config.n_embd)
+        self.position_embedding_table = nn.Embedding(config.block_size, config.n_embd)
+        self.embedding_dropout = nn.Dropout(config.dropout)
+        self.blocks = nn.Sequential() # TODO: implement
+        self.lm_head = nn.Linear(config.n_embd, config.vocab_size)
+        self.ln_f = nn.LayerNorm(config.n_embd, bias=config.bias) # final layer norm
 
-        # construct a transformer with identity + positional embeddings,
-        # dropout
-        # n_layer blocks
-        # and an ending layernorm
+    def forward(self, idx, targets=None):
+        B,T = idx.shape
 
-    def forward(self):
-        return None, None # logits, loss
+        # idx and targets are both (B,T) tensor of integers
+        tok_emb = self.token_embedding_table(idx) # (B,T,C)
+        pos_embd = self.position_embedding_table(torch.arange(T)) # (T, C)
+        x = self.embedding_dropout(tok_emb + pos_embd) # (B,T,C)
+        x = self.blocks(x) # (B,T,C)
+        x = self.ln_f(x) # (B,T,C)
+        logits = self.lm_head(x) # (B,T,vocab_size)
 
-    @torch.no_grad()
+        if targets is None:
+            loss = None
+        else:
+            # conform to what pytorch expects the matrix dims to be
+            B, T, C = logits.shape
+            logits = logits.view(B*T, C)
+            targets = targets.view(B*T)
+            loss = F.cross_entropy(logits, targets)
+
+        return logits, loss
+
     def generate(self, idx, max_new_tokens):
+        for _ in range(max_new_tokens):
+            # get the predictions
+            logits, loss = self.forward(idx)
+            print(f"logits:{logits},loss:{loss}")
+            # focus only on the last time step
+            logits = logits[:, -1, :] # becomes (B,C)
+            # apply softmax to get probabilities
+            probs = F.softmax(logits, dim=-1) # (B,C)
+            # sample from the distribution
+            idx_next = torch.multinomial(probs, num_samples=1) # (B,1)
+            # append sampled index to the running sequence
+            idx = torch.cat((idx, idx_next), dim=1) # (B,T+1)
+
         return idx
