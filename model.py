@@ -50,16 +50,16 @@ class FeedForward(nn.Module):
 class Block(nn.Module):
     def __init__(self, config):
         super().__init__()
-        """
-        GPT-1:
-        [masked self-attention, layernorm, feed forward, layernorm]
-
-        with GPT-2 modifications from paper:
-        [layernorm, masked self-attention, layernorm, feed forward]
-        """
-        self.config = config
+        n_embd = config.n_embd
+        bias = config.bias
+        self.ln1 = nn.LayerNorm(n_embd, bias=bias)
+        self.attention = CausalSelfAttention(config)
+        self.ln2 = nn.LayerNorm(n_embd)
+        self.ffwd = FeedForward(config)
 
     def forward(self, x):
+        x = x + self.attention(self.ln1(x))
+        x = x + self.ffwd(self.ln2(x))
         return x
 
 
@@ -77,12 +77,19 @@ class GPTConfig:
 class GPT(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.token_embedding_table = nn.Embedding(config.vocab_size, config.n_embd)
-        self.position_embedding_table = nn.Embedding(config.block_size, config.n_embd)
-        self.embedding_dropout = nn.Dropout(config.dropout)
-        self.blocks = nn.Sequential() # TODO: implement
-        self.lm_head = nn.Linear(config.n_embd, config.vocab_size)
-        self.ln_f = nn.LayerNorm(config.n_embd, bias=config.bias) # final layer norm
+        n_embd = config.n_embd
+        block_size = config.block_size
+        vocab_size = config.vocab_size
+        n_layer = config.n_layer
+        dropout = config.dropout
+        bias = config.bias
+
+        self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
+        self.position_embedding_table = nn.Embedding(block_size, n_embd)
+        self.embedding_dropout = nn.Dropout(dropout)
+        self.blocks = nn.Sequential(*[Block(config) for _ in range(n_layer)])
+        self.lm_head = nn.Linear(n_embd, vocab_size)
+        self.ln_f = nn.LayerNorm(n_embd, bias=bias) # final layer norm
 
     def forward(self, idx, targets=None):
         B,T = idx.shape
