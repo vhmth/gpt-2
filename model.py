@@ -27,24 +27,21 @@ class CausalSelfAttention(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, config):
         super().__init__()
-        """"
-        [
-            # layers for the MLP
-            Linear,
-            GELU,
+        n_embd = config.n_embd
 
-            # residual projection layer
-            Linear,
+        # core ffwd
+        self.ffwd_linear = nn.Linear(n_embd, 4*n_embd, bias=config.bias) # 4 * per GPT-1 paper specs of inner dimension
+        self.gelu = nn.GELU()
 
-            # dropout for the residual layer (in GPT-1 paper)
-            Dropout
-        ]
-        additional for residual network: [projection,]
-        Linear projection (residual network) -> Linear (learning the )
-        """
-        self.config = config
+        # learned residual projection
+        self.proj_linear = nn.Linear(4*n_embd, n_embd, bias=config.bias)
+        self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, x):
+        x = self.ffwd_linear(x)
+        x = self.gelu(x)
+        x = self.proj_linear(x)
+        x = self.dropout(x)
         return x
 
 class Block(nn.Module):
