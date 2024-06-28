@@ -7,12 +7,30 @@ and GPT-1 papers and figuring stuff out on my own.
 
 ## Setup
 
+### Dependencies
+
 Set up a python environment and install requirements:
 
 ```
 python3 -m venv .
 source ./bin/activate
 pip3 install -r requirements.txt
+```
+
+### Datasets
+
+Then download and prepare the training and val datasets:
+
+```
+python3 ./data/prepare.py
+```
+
+### Training
+
+You can train the model by calling:
+
+```
+python3 ./train.py
 ```
 
 ## Build Details
