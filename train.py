@@ -23,10 +23,10 @@ from pprint import pprint
 import torch
 
 from model import GPTConfig, GPT
+from data.load import get_data_batch, train_data_bin, val_data_bin
 
 # hyperparameters
-batch_size = 64 # how many independent sequences will we process in parallel?
-block_size = 256 # what is the maximum context length for predictions?
+batch_size = 512
 max_iters = 5000
 eval_interval = 500
 learning_rate = 2.5e-4
@@ -59,9 +59,33 @@ parameters = [p for p in list(model.parameters()) if p.requires_grad is True]
 print(f"number of parameters: {len(parameters)}")
 optimizer = torch.optim.AdamW(parameters, lr=learning_rate)
 
-# establish learning loop
-# forward: pull out minibatches of data
-# zerograd
-# train
-# calculate loss
-# update each parameter by the learning rate (TODO: get parameters as list from model)
+@torch.no_grad()
+def estimate_loss():
+    out = {}
+    model.eval()
+    for split in ['train', 'val']:
+        losses = torch.zeros(eval_iters)
+        bin_file = train_data_bin if split == "train" else val_data_bin
+        for k in range(eval_iters):
+            x, y = get_data_batch(bin_file, gpt_config.block_size, batch_size)
+            logits, loss = model(x, y)
+            losses[k] = loss.item()
+        out[split] = losses.mean()
+    model.train()
+    return out
+
+# training loop
+for iter in range(max_iters):
+    # every once in a while evaluate the loss on train and val sets
+    if iter % eval_interval == 0:
+        losses = estimate_loss()
+        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+
+    # sample a batch of data
+    xb, yb = get_data_batch(train_data_bin, gpt_config.block_size, batch_size)
+
+    # evaluate the loss
+    logits, loss = model(xb, yb)
+    optimizer.zero_grad(set_to_none=True)
+    loss.backward()
+    optimizer.step()

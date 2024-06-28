@@ -48,6 +48,6 @@ def load_data_docs(filename, num_docs = 1):
 def get_data_batch(data_file, block_size, batch_size):
     data_arr = np.memmap(data_file, dtype=np.uint16, mode='r')
     batch_offsets = torch.randint(len(data_arr) - block_size, (batch_size,))
-    X = torch.stack([torch.from_numpy(data_arr[i:i+block_size]) for i in batch_offsets])
-    Y = torch.stack([torch.from_numpy(data_arr[i+1:i+1+block_size]) for i in batch_offsets])
+    X = torch.stack([torch.from_numpy(data_arr[i:i+block_size].astype(np.int64)) for i in batch_offsets])
+    Y = torch.stack([torch.from_numpy(data_arr[i+1:i+1+block_size].astype(np.int64)) for i in batch_offsets])
     return X, Y
