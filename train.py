@@ -37,6 +37,8 @@ learning_rate = 2.5e-4
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # -------------
 
+print(f"selected device: {device}")
+
 # load the model
 gpt_config = GPTConfig()
 print("initializing GPT with config:")
