@@ -27,11 +27,13 @@ from data.load import get_data_batch, train_data_bin, val_data_bin
 
 # hyperparameters
 batch_size = 512
-max_iters = 5000
-eval_interval = 500
+max_iters = 5000 # maximum number of training iters
+
+eval_interval = 500 # every num training iters we print estimated loss at
+eval_iters = 200 # number of training and val data samples we estimate loss over
+
 learning_rate = 2.5e-4
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-eval_iters = 200
 # -------------
 
 # load the model
