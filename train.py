@@ -10,11 +10,11 @@ $ python3 ./train.py
 
 TODOS:
 
-- get onto lightning studio
 - run via torchrun (https://pytorch.org/docs/stable/elastic/run.html) for efficiency
 - implement checkpoints via torch.save and torch.load
 - log to wandb or neptune
 - cuda-ify everything
+- lightning litgpt optimizations
 """
 
 from dataclasses import asdict
@@ -77,6 +77,7 @@ def estimate_loss():
     return out
 
 # training loop
+# TODO: put in tqdm to show training progress
 for iter in range(max_iters):
     # every once in a while evaluate the loss on train and val sets
     if iter % eval_interval == 0:
