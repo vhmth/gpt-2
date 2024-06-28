@@ -1,3 +1,5 @@
+__pycache__/
+
 # python3 -m venv .
 bin/
 lib/
