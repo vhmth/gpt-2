@@ -21,6 +21,7 @@ from dataclasses import asdict
 from pprint import pprint
 
 import torch
+from tqdm import tqdm
 
 from model import GPTConfig, GPT
 from data.load import get_data_batch, train_data_bin, val_data_bin
@@ -77,8 +78,7 @@ def estimate_loss():
     return out
 
 # training loop
-# TODO: put in tqdm to show training progress
-for iter in range(max_iters):
+for iter in tqdm(range(max_iters), desc=f"training GPT {max_iters} epochs"):
     # every once in a while evaluate the loss on train and val sets
     if iter % eval_interval == 0:
         losses = estimate_loss()
