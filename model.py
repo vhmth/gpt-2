@@ -11,17 +11,68 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
+# modified from previous lesson with bigram model
+class Head(nn.Module):
+    """ one head of self-attention """
+
+    def __init__(self, config, head_size):
+        super().__init__()
+        n_embd = config.n_embd
+        bias = config.bias
+        block_size = config.block_size
+
+        self.key = nn.Linear(n_embd, head_size, bias=bias)
+        self.query = nn.Linear(n_embd, head_size, bias=bias)
+        self.value = nn.Linear(n_embd, head_size, bias=bias)
+        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
+        self.dropout = nn.Dropout(config.dropout)
+
+    def forward(self, x):
+        B,T,C = x.shape
+        k = self.key(x) # (B,T,C)
+        q = self.query(x) # (B,T,C)
+        # compute attention scores ("affinities")
+        wei = q @ k.transpose(-2,-1) * C**-0.5 # (B,T,C) @ (B,C,T) -> (B,T,T)
+        wei = wei.masked_fill(self.tril[:T,:T] == 0, float('-inf')) # (B,T,T)
+        wei = F.softmax(wei, dim=-1) # (B,T,T)
+        wei = self.dropout(wei)
+        # perform the weighted aggregation of the values
+        v = self.value(x) # (B,T,C)
+        out = wei @ v
+        return out
+
 class CausalSelfAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
-        """
-        same as usual causal self-attention but with:
-        - attention Dropout
-        - Linear projection for the residual network
-        - residual dropout
-        """
+        n_head = config.n_head
+        n_embd = config.n_embd
+        self.heads = nn.ModuleList([Head(config, n_embd // n_head) for _ in range(n_head)])
+        self.residual_proj = nn.Linear(n_embd, n_embd) # projection layer going back into the residual pathway
+        self.residual_dropout = nn.Dropout(config.dropout)
 
     def forward(self, x):
+        out = torch.cat([h(x) for h in self.heads], dim=-1)
+        out = self.residual_dropout(self.residual_proj(out))
+        return x
+
+class Block(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        n_embd = config.n_embd
+        bias = config.bias
+        self.ln1 = nn.LayerNorm(n_embd, bias=bias)
+        self.attention = CausalSelfAttention(config)
+        self.ln2 = nn.LayerNorm(n_embd)
+        self.ffwd = FeedForward(config)
+
+    def forward(self, x):
+        # note: "x +" represents a residual connection
+        # you will need projection layers in the attention
+        # and ffwd blocks to learn whether this identity
+        # flow-through gradient is better in the context of
+        # the training data!
+        x = x + self.attention(self.ln1(x))
+        x = x + self.ffwd(self.ln2(x))
         return x
 
 class FeedForward(nn.Module):
