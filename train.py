@@ -13,7 +13,6 @@ TODOS:
 - run via torchrun (https://pytorch.org/docs/stable/elastic/run.html) for efficiency
 - implement checkpoints via torch.save and torch.load
 - log to wandb or neptune
-- cuda-ify everything
 - lightning litgpt optimizations
 """
 
@@ -37,13 +36,14 @@ learning_rate = 2.5e-4
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # -------------
 
-print(f"selected device: {device}")
-
 # load the model
 gpt_config = GPTConfig()
 print("initializing GPT with config:")
 pprint(asdict(gpt_config), sort_dicts=False)
 model = GPT(gpt_config)
+
+print(f"selected device: {device}")
+model.to(device)
 
 # create optimizer
 # according to the GPT-1 paper:
@@ -72,7 +72,7 @@ def estimate_loss():
         losses = torch.zeros(eval_iters)
         bin_file = train_data_bin if split == "train" else val_data_bin
         for k in range(eval_iters):
-            x, y = get_data_batch(bin_file, gpt_config.block_size, batch_size)
+            x, y = get_data_batch(bin_file, gpt_config.block_size, batch_size, device)
             logits, loss = model(x, y)
             losses[k] = loss.item()
         out[split] = losses.mean()
