@@ -106,7 +106,9 @@ def estimate_loss():
         for k in tqdm(range(eval_iters), desc=f"estimating {split} loss over {eval_iters} iters", leave=False):
             x, y = get_data_batch(bin_file, gpt_config.block_size, batch_size, device)
             logits, loss = model(x, y)
-            losses[k] = loss.item()
+            # must use loss.mean() in case this is returning multiple
+            # losses per GPU data batch
+            losses[k] = loss.mean().item()
         out[split] = losses.mean()
     model.train()
     return out
