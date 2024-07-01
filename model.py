@@ -114,6 +114,7 @@ class Block(nn.Module):
 # largely copied from nanogpt
 @dataclass
 class GPTConfig:
+    device: str = "cpu" # cpu or cuda
     block_size: int = 1024 # context length
     vocab_size: int = 50257
     n_layer: int = 12
@@ -132,6 +133,7 @@ class GPT(nn.Module):
         dropout = config.dropout
         bias = config.bias
 
+        self.device = config.device
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.embedding_dropout = nn.Dropout(dropout)
@@ -144,7 +146,7 @@ class GPT(nn.Module):
 
         # idx and targets are both (B,T) tensor of integers
         tok_emb = self.token_embedding_table(idx) # (B,T,C)
-        pos_embd = self.position_embedding_table(torch.arange(T)) # (T, C)
+        pos_embd = self.position_embedding_table(torch.arange(T, device=self.device)) # (T, C)
         x = self.embedding_dropout(tok_emb + pos_embd) # (B,T,C)
         x = self.blocks(x) # (B,T,C)
         x = self.ln_f(x) # (B,T,C)
@@ -165,7 +167,6 @@ class GPT(nn.Module):
         for _ in range(max_new_tokens):
             # get the predictions
             logits, loss = self.forward(idx)
-            print(f"logits:{logits},loss:{loss}")
             # focus only on the last time step
             logits = logits[:, -1, :] # becomes (B,C)
             # apply softmax to get probabilities

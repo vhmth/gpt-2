@@ -37,12 +37,9 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # -------------
 
 # load the model
-gpt_config = GPTConfig()
-print("initializing GPT with config:")
+gpt_config = GPTConfig(device=device)
 pprint(asdict(gpt_config), sort_dicts=False)
 model = GPT(gpt_config)
-
-print(f"selected device: {device}")
 model.to(device)
 
 # create optimizer
