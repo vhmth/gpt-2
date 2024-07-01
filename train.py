@@ -10,7 +10,6 @@ $ python3 ./train.py
 
 TODOS:
 
-- run via torchrun (https://pytorch.org/docs/stable/elastic/run.html) for efficiency
 - cosine annealing + linear warmup training
 - log to wandb or neptune
 - lightning litgpt optimizations
@@ -22,6 +21,7 @@ from dataclasses import asdict
 from pprint import pprint
 
 import torch
+import torch.nn as nn
 from tqdm import tqdm
 
 from model import GPTConfig, GPT
@@ -44,7 +44,7 @@ chkpt_file = os.path.join(out_dir, 'chckpt.pt')
 # load the model
 gpt_config = GPTConfig(device=device)
 pprint(asdict(gpt_config), sort_dicts=False)
-model = GPT(gpt_config)
+model = nn.DataParallel(GPT(gpt_config))
 model.to(device)
 
 # create optimizer
