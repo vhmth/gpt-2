@@ -10,11 +10,11 @@ $ python3 ./train.py
 
 TODOS:
 
-- cosine annealing + linear warmup training
 - log to wandb or neptune
 - lightning litgpt optimizations
 """
 
+import math
 import os
 import sys
 from dataclasses import asdict
@@ -34,7 +34,12 @@ max_iters = 600000 # maximum number of training iters
 eval_interval = 1000 # every num training iters we print estimated loss at
 eval_iters = 200 # number of training and val data samples we estimate loss over
 
-learning_rate = 6e-4
+warmup_iters = 2000 # linear warmup steps per the paper
+learning_rate = 6e-4 # max learning rate
+min_lr = 6e-5
+lr_decay_iters = 600000
+decay_lr = True # whether to decay the learning rate
+
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 init_from = "scratch" # change to "resume" if loading from a checkpoint
 out_dir = 'out'
@@ -106,12 +111,31 @@ def estimate_loss():
     model.train()
     return out
 
+# learning rate decay scheduler (cosine with warmup)
+def get_lr(it):
+    # 1) linear warmup for warmup_iters steps
+    if it < warmup_iters:
+        return learning_rate * it / warmup_iters
+    # 2) if it > lr_decay_iters, return min learning rate
+    if it > lr_decay_iters:
+        return min_lr
+    # 3) in between, use cosine decay down to min learning rate
+    decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
+    assert 0 <= decay_ratio <= 1
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coeff ranges 0..1
+    return min_lr + coeff * (learning_rate - min_lr)
+
 # training loop
 for iter in tqdm(range(curr_epoch, max_iters), desc=f"training GPT {max_iters} epochs"):
+    # determine and set the learning rate for this iteration
+    lr = get_lr(iter) if decay_lr else learning_rate
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
     # every once in a while evaluate the loss on train and val sets
     if iter % eval_interval == 0:
         losses = estimate_loss()
-        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}, lr {lr}")
 
         best_val_loss = losses['val'] if best_val_loss is None else min(losses['val'], best_val_loss)
         curr_epoch = iter
