@@ -11,6 +11,7 @@ $ python3 ./train.py
 TODOS:
 
 - run via torchrun (https://pytorch.org/docs/stable/elastic/run.html) for efficiency
+- cosine annealing + linear warmup training
 - log to wandb or neptune
 - lightning litgpt optimizations
 """
