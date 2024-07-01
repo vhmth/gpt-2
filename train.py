@@ -156,6 +156,9 @@ for iter in tqdm(range(curr_epoch, max_iters), desc=f"training GPT {max_iters} e
 
     # evaluate the loss
     logits, loss = model(xb, yb)
+    # must use loss.mean() in case this is returning multiple
+    # losses per GPU data batch
+    loss = loss.mean()
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     optimizer.step()
