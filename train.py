@@ -29,7 +29,7 @@ from data.load import get_data_batch, train_data_bin, val_data_bin
 batch_size = 12
 max_iters = 5000 # maximum number of training iters
 
-eval_interval = 500 # every num training iters we print estimated loss at
+eval_interval = 2000 # every num training iters we print estimated loss at
 eval_iters = 200 # number of training and val data samples we estimate loss over
 
 learning_rate = 2.5e-4
