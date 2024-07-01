@@ -84,7 +84,7 @@ for iter in tqdm(range(max_iters), desc=f"training GPT {max_iters} epochs"):
         print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
     # sample a batch of data
-    xb, yb = get_data_batch(train_data_bin, gpt_config.block_size, batch_size)
+    xb, yb = get_data_batch(train_data_bin, gpt_config.block_size, batch_size, device)
 
     # evaluate the loss
     logits, loss = model(xb, yb)
