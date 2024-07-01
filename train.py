@@ -68,7 +68,8 @@ model.to(device)
 #
 # more on AdamW here: https://arxiv.org/pdf/1711.05101
 parameters = [p for p in list(model.parameters()) if p.requires_grad is True]
-print(f"number of parameters: {len(parameters)}")
+num_params = sum(p.numel() for p in parameters)
+print(f"number of parameters: {num_params}")
 optimizer = torch.optim.AdamW(parameters, lr=learning_rate)
 
 # handle checkpoints - for more info:
