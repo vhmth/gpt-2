@@ -68,7 +68,7 @@ def estimate_loss():
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters)
         bin_file = train_data_bin if split == "train" else val_data_bin
-        for k in range(eval_iters):
+        for k in tqdm(range(eval_iters), desc=f"estimating {split} loss over {eval_iters} iters"):
             x, y = get_data_batch(bin_file, gpt_config.block_size, batch_size, device)
             logits, loss = model(x, y)
             losses[k] = loss.item()
