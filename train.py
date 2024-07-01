@@ -25,7 +25,7 @@ import torch.nn as nn
 from tqdm import tqdm
 
 from model import GPTConfig, GPT
-from data.load import get_data_batch, train_data_bin, val_data_bin
+from data.load import get_data_batch
 
 # hyperparameters
 batch_size = 12
@@ -103,9 +103,8 @@ def estimate_loss():
     model.eval()
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters)
-        bin_file = train_data_bin if split == "train" else val_data_bin
         for k in tqdm(range(eval_iters), desc=f"estimating {split} loss over {eval_iters} iters", leave=False):
-            x, y = get_data_batch(bin_file, gpt_config.block_size, batch_size, device)
+            x, y = get_data_batch(split, gpt_config.block_size, batch_size, device)
             logits, loss = model(x, y)
             # must use loss.mean() in case this is returning multiple
             # losses per GPU data batch
@@ -152,7 +151,7 @@ for iter in tqdm(range(curr_epoch, max_iters), desc=f"training GPT {max_iters} e
         torch.save(checkpoint, chkpt_file)
 
     # sample a batch of data
-    xb, yb = get_data_batch(train_data_bin, gpt_config.block_size, batch_size, device)
+    xb, yb = get_data_batch("train", gpt_config.block_size, batch_size, device)
 
     # evaluate the loss
     logits, loss = model(xb, yb)

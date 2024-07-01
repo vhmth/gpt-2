@@ -1,4 +1,6 @@
 import os
+import psutil
+from psutil._common import bytes2human
 
 import numpy as np
 import tiktoken
@@ -42,11 +44,33 @@ def load_data_docs(filename, num_docs = 1):
     
     return docs
 
-# data_file is a path object to either the train or test data bins
+train_data_arr = None
+val_data_arr = None
+train_data_size = os.stat(train_data_bin).st_size
+val_data_size = os.stat(val_data_bin).st_size
+total_data_arr_size = train_data_size + val_data_size
+should_load_into_mem = psutil.virtual_memory().available > (total_data_arr_size + 1e9) # 1e9 (1GB) memory for good measure
+def get_data_file(split = "train"):
+    global val_data_arr
+    global train_data_arr
+    if not should_load_into_mem:
+        return np.memmap(train_data_bin if split == "train" else val_data_bin, dtype=np.uint16, mode='r')
+
+    if train_data_arr is None:
+        print(f"loading {bytes2human(train_data_size)} of training data into memory (this might take a while)")
+        train_data_arr = np.fromfile(train_data_bin, dtype=np.uint16)
+
+    if val_data_arr is None:
+        print(f"loading {bytes2human(val_data_size)} of val data into memory")
+        val_data_arr = np.fromfile(val_data_bin, dtype=np.uint16)
+
+    return train_data_arr if split == "train" else val_data_arr
+
+# split is either "train" or "val"
 # block_size is the context length feeding into the transformer
 # batch_size is the number of examples to pull
-def get_data_batch(data_file, block_size, batch_size, device = "cpu"):
-    data_arr = np.memmap(data_file, dtype=np.uint16, mode='r')
+def get_data_batch(split, block_size, batch_size, device = "cpu"):
+    data_arr = get_data_file(split)
     batch_offsets = torch.randint(len(data_arr) - block_size, (batch_size,))
     X = torch.stack([torch.from_numpy(data_arr[i:i+block_size].astype(np.int64)).to(device) for i in batch_offsets])
     Y = torch.stack([torch.from_numpy(data_arr[i+1:i+1+block_size].astype(np.int64)).to(device) for i in batch_offsets])
