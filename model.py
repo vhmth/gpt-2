@@ -16,7 +16,7 @@ from torch.nn import functional as F
 # my previous bigram implementation from the course, but it was too slow since:
 #
 # 1. It used separate k,v,q tensors for each head instead of 1
-# 2. It die not take advantage of flash attention (scaled_dot_product_attention)
+# 2. It did not take advantage of flash attention (scaled_dot_product_attention)
 class CausalSelfAttention(nn.Module):
 
     def __init__(self, config):
