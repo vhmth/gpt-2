@@ -26,7 +26,7 @@ from model import GPTConfig, GPT
 from data.load import get_data_batch, train_data_bin, val_data_bin
 
 # hyperparameters
-batch_size = 512
+batch_size = 12
 max_iters = 5000 # maximum number of training iters
 
 eval_interval = 500 # every num training iters we print estimated loss at
