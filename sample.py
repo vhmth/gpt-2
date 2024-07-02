@@ -12,9 +12,17 @@ import torch.nn as nn
 from checkpoint.checkpoint import get_and_load_committed_checkpoint
 from model import GPTConfig, GPT
 
+# options
+
+# by default, load with the prompt "Hello, I'm a language model,"
+# if this is True, loads with 0s
+load_with_no_prompt = False
+# -------------
+
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 gpt_config = GPTConfig(device=device)
 model = nn.DataParallel(GPT(gpt_config))
+model.eval()
 model.to(device)
 
 chkpt_file = os.path.join('out', 'chckpt.pt')
@@ -26,7 +34,12 @@ if checkpoint == None:
 
 # generate from the model
 enc = tiktoken.get_encoding("gpt2")
-context = torch.zeros((1,1), dtype=torch.long, device=device)
+
+if load_with_no_prompt:
+    context = torch.zeros((1,1), dtype=torch.long, device=device)
+else:
+    start_ids = enc.encode("Hello, I'm a language model,", allowed_special={"<|endoftext|>"})
+    context = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
 
 with torch.no_grad():
-    print(enc.decode(model.module.generate(context, max_new_tokens=500)[0].tolist()))
+    print(enc.decode(model.module.generate(context, max_new_tokens=100)[0].tolist()))
