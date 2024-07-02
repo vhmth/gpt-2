@@ -46,7 +46,10 @@ init_from = "scratch"
 out_dir = 'out'
 chkpt_file = training_checkpoint
 
-compile = True # whether to leverage torch.compile (requires > 2 PyTorch)
+# whether to leverage torch.compile
+# make sure we can only run this on versions of python < 3.12:
+# https://github.com/pytorch/pytorch/issues/120233
+compile = sys.version_info[0] < 3 or sys.version_info[1] < 12
 # -------------
 
 # load the model
