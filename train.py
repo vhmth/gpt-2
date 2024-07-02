@@ -45,6 +45,8 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 init_from = "scratch"
 out_dir = 'out'
 chkpt_file = training_checkpoint
+
+compile = True # whether to leverage torch.compile (requires > 2 PyTorch)
 # -------------
 
 # load the model
@@ -100,6 +102,10 @@ if init_from == "resume":
     checkpoint = get_and_load_training_checkpoint(model, optimizer, device)
     curr_epoch = checkpoint['curr_epoch']
     best_val_loss = checkpoint['best_val_loss']
+
+if compile:
+    print("compiling model")
+    model = torch.compile(model)
 
 @torch.no_grad()
 def estimate_loss():
