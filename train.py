@@ -59,8 +59,7 @@ model.to(device)
 # - increase rate linearly from 0 for first 2000 updates
 # - annealed to 0 using cosine schedule
 #
-# we are going to see if we can ignore the cosine annealing
-# and linear increase for the first 2000 updates.
+# check out `get_lr` below for points 2-3.
 #
 # we are going to use the AdamW optimizer to avoid needing to
 # include the "modified L2 regularization" mentioned in the
