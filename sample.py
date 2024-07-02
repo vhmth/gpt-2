@@ -9,6 +9,7 @@ import tiktoken
 import torch
 import torch.nn as nn
 
+from checkpoint.checkpoint import get_and_load_committed_checkpoint
 from model import GPTConfig, GPT
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -18,16 +19,9 @@ model.to(device)
 
 chkpt_file = os.path.join('out', 'chckpt.pt')
 
-checkpoint = None
-if os.path.exists(chkpt_file):
-    print(f"loading checkpoint from {chkpt_file}")
-    checkpoint = torch.load(chkpt_file)
-    model.load_state_dict(checkpoint['model_state_dict'])
+checkpoint = get_and_load_committed_checkpoint(model, device=device)
 
-    curr_epoch = checkpoint['curr_epoch']
-    best_val_loss = checkpoint['best_val_loss']
-    print(f"loaded checkpoint, trained over {curr_epoch} epochs with best val loss: {best_val_loss}")
-else:
+if checkpoint == None:
     print("no checkpoint file found, loading untrained model")
 
 # generate from the model

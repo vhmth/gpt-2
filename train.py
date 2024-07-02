@@ -24,6 +24,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
+from checkpoint.checkpoint import get_and_load_training_checkpoint, training_checkpoint
 from model import GPTConfig, GPT
 from data.load import get_data_batch
 
@@ -41,9 +42,9 @@ lr_decay_iters = 600000
 decay_lr = True # whether to decay the learning rate
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-init_from = "scratch" # change to "resume" if loading from a checkpoint
+init_from = "scratch"
 out_dir = 'out'
-chkpt_file = os.path.join(out_dir, 'chckpt.pt')
+chkpt_file = training_checkpoint
 # -------------
 
 # load the model
@@ -78,23 +79,27 @@ os.makedirs(out_dir, exist_ok=True)
 if init_from == "scratch" and os.path.exists(chkpt_file):
     replace_checkpoint = input(f"""
         Checkpoint file exists at {chkpt_file}.
-        Are you sure you want to train the model from scratch and replace the checkpoint?
-        If you don't, close out and replace `init_from = "resume"` in model.py.
+        Do you want to train the model from scratch and replace the checkpoint?
         If you do, respond with "y" or "yes":
     """)
 
     if replace_checkpoint.lower() not in ["y", "yes"]:
-        sys.exit()
+        resume_from_checkpoint = input(f"""
+            Would you like to resume training from {chkpt_file}?
+            If you do, respond with "y" or "yes":
+        """)
+
+        if replace_checkpoint.lower() in ["y", "yes"]:
+            init_from = "resume"
+        else:
+            sys.exit()
 
 curr_epoch = 0
 best_val_loss = None
-if init_from == "resume" and os.path.exists(chkpt_file):
-    checkpoint = torch.load(chkpt_file)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+if init_from == "resume":
+    checkpoint = get_and_load_training_checkpoint(model, optimizer, device)
     curr_epoch = checkpoint['curr_epoch']
     best_val_loss = checkpoint['best_val_loss']
-    print(f"loaded from checkpoint, current epoch: {curr_epoch}, best val loss: {best_val_loss}")
 
 @torch.no_grad()
 def estimate_loss():

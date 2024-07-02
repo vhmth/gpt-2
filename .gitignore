@@ -10,5 +10,5 @@ pyvenv.cfg
 data/train.bin
 data/val.bin
 
-# checkpoint
+# checkpoint and other training artifacts
 out/

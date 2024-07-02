@@ -33,6 +33,22 @@ You can train the model by calling:
 python3 ./train.py
 ```
 
+Note that this, by default, loads the training checkpoint located in
+`out/*.pt`. If there is no training checkpoint, it starts training the model
+from scratch.
+
+### Sampling
+
+Sample from the model by calling:
+
+```
+python3 ./sample.py
+```
+
+Note that this, by default, loads the committed checkpoint located in
+`checkpoint/*.pt`. If there is no committed checkpoint, it will sample from
+an untrained model.
+
 ## Build Details
 
 ### Links
