@@ -59,7 +59,8 @@ compile = sys.version_info[0] < 3 or sys.version_info[1] < 12
 torch.set_float32_matmul_precision('high')
 
 # load the model
-gpt_config = GPTConfig(device=device)
+# load vocab_size to nearest divisibility of 2 to speed up token throughput on GPU
+gpt_config = GPTConfig(device=device, vocab_size=50304)
 pprint(asdict(gpt_config), sort_dicts=False)
 model = nn.DataParallel(GPT(gpt_config))
 model.to(device)
