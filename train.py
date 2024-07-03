@@ -49,7 +49,11 @@ chkpt_file = training_checkpoint
 # whether to leverage torch.compile
 # make sure we can only run this on versions of python < 3.12:
 # https://github.com/pytorch/pytorch/issues/120233
-compile = sys.version_info[0] < 3 or sys.version_info[1] < 12
+# compile = sys.version_info[0] < 3 or sys.version_info[1] < 12
+
+# I would love to turn this on, but compilation throws errors with weight sharing
+# and weight sharing leads to much better perf than compilation
+compile = False
 # -------------
 
 # load the model
