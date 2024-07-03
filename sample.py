@@ -21,7 +21,7 @@ load_with_no_prompt = False
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 gpt_config = GPTConfig(device=device)
-model = nn.DataParallel(GPT(gpt_config))
+model = GPT(gpt_config)
 model.eval()
 model.to(device)
 
@@ -42,4 +42,4 @@ else:
     context = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
 
 with torch.no_grad():
-    print(enc.decode(model.module.generate(context, max_new_tokens=100)[0].tolist()))
+    print(enc.decode(model.generate(context, max_new_tokens=100)[0].tolist()))

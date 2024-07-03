@@ -30,7 +30,7 @@ from model import GPTConfig, GPT
 from data.load import get_data_batch
 
 # hyperparameters
-batch_size = 20
+batch_size = 16 # micro batch size
 max_iters = 600000 # maximum number of training iters
 
 should_estimate_loss = True # useful to turn this off if optimizing or debugging the main training loop
@@ -63,8 +63,15 @@ torch.set_float32_matmul_precision('high')
 # load vocab_size to nearest divisibility of 2 to speed up token throughput on GPU
 gpt_config = GPTConfig(device=device, vocab_size=50304)
 pprint(asdict(gpt_config), sort_dicts=False)
-model = nn.DataParallel(GPT(gpt_config))
+model = GPT(gpt_config)
 model.to(device)
+
+# gradient accumulation calculations
+total_batch_size = 524288 # 2^19, ~0.5M tokens (following GPT-3 paper)
+assert total_batch_size % (batch_size * gpt_config.block_size) == 0, "make sure total_batch_size is divisible by B * T"
+grad_accum_steps = total_batch_size // (batch_size * gpt_config.block_size)
+print(f"total desired batch size: {total_batch_size}")
+print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
 
 # create optimizer
 # according to the GPT-1 paper:
@@ -83,7 +90,7 @@ model.to(device)
 parameters = [p for p in list(model.parameters()) if p.requires_grad is True]
 num_params = sum(p.numel() for p in parameters)
 print(f"number of parameters: {num_params}")
-optimizer = model.module.configure_optimizers(weight_decay=0.1, learning_rate=learning_rate, betas=adamw_betas, device=device)
+optimizer = model.configure_optimizers(weight_decay=0.1, learning_rate=learning_rate, betas=adamw_betas, device=device)
 
 # handle checkpoints - for more info:
 # https://pytorch.org/tutorials/recipes/recipes/saving_and_loading_a_general_checkpoint.html
@@ -127,9 +134,7 @@ def estimate_loss():
         for k in tqdm(range(eval_iters), desc=f"estimating {split} loss over {eval_iters} iters", leave=False):
             x, y = get_data_batch(split, gpt_config.block_size, batch_size, device)
             logits, loss = model(x, y)
-            # must use loss.mean() in case this is returning multiple
-            # losses per GPU data batch
-            losses[k] = loss.mean().item()
+            losses[k] = loss.item()
         out[split] = losses.mean()
     model.train()
     return out
@@ -172,26 +177,26 @@ for iter in range(curr_epoch, max_iters):
         torch.save(checkpoint, chkpt_file)
 
     t0 = time.time()
-
-    # sample a batch of data
-    xb, yb = get_data_batch("train", gpt_config.block_size, batch_size, device)
-
     optimizer.zero_grad(set_to_none=True)
 
-    # used mixed precision autocasting to speed up GPU throughput
-    with torch.autocast(device_type=device, dtype=torch.bfloat16):
-        # evaluate the loss
-        logits, loss = model(xb, yb)
-        # must use loss.mean() in case this is returning multiple
-        # losses per GPU data batch
-        loss = loss.mean()
+    # gradient accumulation
+    loss_accum = 0.0
+    for micro_step in range(grad_accum_steps):
+        xb, yb = get_data_batch("train", gpt_config.block_size, batch_size, device)
+        # used mixed precision autocasting to speed up GPU throughput
+        with torch.autocast(device_type=device, dtype=torch.bfloat16):
+            # evaluate the loss
+            logits, loss = model(xb, yb)
+        loss = loss / grad_accum_steps # scale the loss to account for gradient accumluation
+        loss_accum += loss.detach()
+        loss.backward()
+        optimizer.step()
 
-    loss.backward()
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0) # prevent the model from getting gradient shocks
-    optimizer.step()
 
     torch.cuda.synchronize() # wait for GPU to finish work before taking time
     t1 = time.time()
     dt = t1 - t0
-    tokens_per_sec = batch_size * gpt_config.block_size / dt
-    print(f"step {iter:5d} | loss: {loss.item():.6f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec:.2f}")
+    tokens_processed = batch_size * gpt_config.block_size * grad_accum_steps
+    tokens_per_sec = tokens_processed / dt
+    print(f"step {iter:5d} | loss: {loss_accum.item():.6f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec:.2f}")
