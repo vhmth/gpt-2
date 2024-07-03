@@ -39,7 +39,7 @@ eval_iters = 200 # number of training and val data samples we estimate loss over
 
 warmup_iters = 2000 # linear warmup steps per the paper
 learning_rate = 6e-4 # max learning rate
-min_lr = 6e-5
+min_lr = 6e-5 # (10% of max learning rate per GPT-3 paper)
 lr_decay_iters = 600000
 decay_lr = True # whether to decay the learning rate
 adamw_betas = (0.9, 0.95) # from GPT-3
@@ -188,10 +188,11 @@ for iter in range(curr_epoch, max_iters):
         loss = loss.mean()
 
     loss.backward()
+    norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0) # prevent the model from getting gradient shocks
     optimizer.step()
 
-    torch.cuda.synchronize()
+    torch.cuda.synchronize() # wait for GPU to finish work before taking time
     t1 = time.time()
-    dt = (t1-t0) * 1000
+    dt = t1 - t0
     tokens_per_sec = batch_size * gpt_config.block_size / dt
-    print(f"step {iter}, loss: {loss.item()}, dt: {dt}ms, tok/sec: {tokens_per_sec}")
+    print(f"step {iter:5d} | loss: {loss.item():.6f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec:.2f}")
