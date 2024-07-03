@@ -24,14 +24,19 @@ class CausalSelfAttention(nn.Module):
         assert config.n_embd % config.n_head == 0
         # key, query, value projections for all heads, but in a batch
         self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd, bias=config.bias)
+
         # output projection
         self.c_proj = nn.Linear(config.n_embd, config.n_embd, bias=config.bias)
+        self.c_proj.GPT2_SCALE_INIT = 1
+
         # regularization
         self.attn_dropout = nn.Dropout(config.dropout)
         self.resid_dropout = nn.Dropout(config.dropout)
+
         self.n_head = config.n_head
         self.n_embd = config.n_embd
         self.dropout = config.dropout
+
         # flash attention make GPU go brrrrr but support is only in PyTorch >= 2.0
         self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention')
         if not self.flash:
@@ -97,6 +102,7 @@ class FeedForward(nn.Module):
 
         # learned residual projection
         self.proj_linear = nn.Linear(4*n_embd, n_embd, bias=config.bias)
+        self.proj_linear.GPT2_SCALE_INIT = 1
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, x):
@@ -140,7 +146,7 @@ class GPT(nn.Module):
         n_embd = config.n_embd
         block_size = config.block_size
         vocab_size = config.vocab_size
-        n_layer = config.n_layer
+        self.n_layer = n_layer = config.n_layer
         dropout = config.dropout
         bias = config.bias
 
@@ -168,6 +174,17 @@ class GPT(nn.Module):
 
     def __init_weights(self, module):
         if isinstance(module, nn.Linear):
+            std = 0.02
+
+            # scale down the std by 1/sqrt(N) where N is the number of layers
+            # deep of residual layers in order to compensate for growing std
+            # of the residual pathway
+            #
+            # note that we multiply by 2 here since there are 2 residual pathways
+            # per block (attention and ffwd)
+            if hasattr(module, 'GPT2_SCALE_INIT'):
+                std *= (2 * math.sqrt(self.n_layer))**-0.5
+
             torch.nn.init.normal(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
