@@ -155,7 +155,7 @@ class GPT(nn.Module):
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.embedding_dropout = nn.Dropout(dropout)
         self.blocks = nn.Sequential(*[Block(config) for _ in range(n_layer)])
-        self.lm_head = nn.Linear(n_embd, vocab_size)
+        self.lm_head = nn.Linear(n_embd, vocab_size, bias=False)
         self.ln_f = nn.LayerNorm(n_embd, bias=bias) # final layer norm
 
         # weight sharing between the position embedding and language model head
