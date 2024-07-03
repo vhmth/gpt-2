@@ -155,17 +155,7 @@ class GPT(nn.Module):
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.embedding_dropout = nn.Dropout(dropout)
         self.blocks = nn.Sequential(*[Block(config) for _ in range(n_layer)])
-        self.lm_head = nn.Linear(n_embd, vocab_size, bias=False)
         self.ln_f = nn.LayerNorm(n_embd, bias=bias) # final layer norm
-
-        # weight sharing between the position embedding and language model head
-        # ^ used in attention is all you need paper (section 3.4)
-        #
-        # personally, I still don't understand why this is better. semantically, I
-        # guess the output of the head will encode the same information about a given
-        # token as the token embedding table, but it's interesting that it actually
-        # works. I need to read the paper.
-        self.token_embedding_table.weight = self.lm_head.weight
 
         # normalize weights with a std of 0.02 (per gpt-2 paper)
         # note that this is roughly (but not exactly) equivalent to initializing
@@ -200,7 +190,12 @@ class GPT(nn.Module):
         x = self.embedding_dropout(tok_emb + pos_embd) # (B,T,C)
         x = self.blocks(x) # (B,T,C)
         x = self.ln_f(x) # (B,T,C)
-        logits = self.lm_head(x) # (B,T,vocab_size)
+
+        # weight sharing between the position embedding and language model head
+        # ^ used in attention is all you need paper (section 3.4)
+        #
+        # this is equivalent to lm_head
+        logits = F.linear(x, weight=self.token_embedding_table.weight) # (B,T,vocab_size)
 
         if targets is None:
             loss = None
