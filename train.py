@@ -16,6 +16,7 @@ TODOS:
 
 import math
 import os
+import time
 import sys
 from dataclasses import asdict
 from pprint import pprint
@@ -171,14 +172,26 @@ for iter in range(curr_epoch, max_iters):
         print(f"saving checkpoint to {chkpt_file}...")
         torch.save(checkpoint, chkpt_file)
 
+    t0 = time.time()
+
     # sample a batch of data
     xb, yb = get_data_batch("train", gpt_config.block_size, batch_size, device)
 
-    # evaluate the loss
-    logits, loss = model(xb, yb)
-    # must use loss.mean() in case this is returning multiple
-    # losses per GPU data batch
-    loss = loss.mean()
     optimizer.zero_grad(set_to_none=True)
+
+    # used mixed precision autocasting to speed up GPU throughput
+    with torch.autocast(device_type=device, dtype=torch.bfloat16):
+        # evaluate the loss
+        logits, loss = model(xb, yb)
+        # must use loss.mean() in case this is returning multiple
+        # losses per GPU data batch
+        loss = loss.mean()
+
     loss.backward()
     optimizer.step()
+
+    torch.cuda.synchronize()
+    t1 = time.time()
+    dt = (t1-t0) * 1000
+    tokens_per_sec = batch_size * gpt_config.block_size / dt
+    print(f"step {iter}, loss: {loss.item()}, dt: {dt}ms, tok/sec: {tokens_per_sec}")
