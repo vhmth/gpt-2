@@ -185,11 +185,11 @@ class GPT(nn.Module):
             if hasattr(module, 'GPT2_SCALE_INIT'):
                 std *= (2 * math.sqrt(self.n_layer))**-0.5
 
-            torch.nn.init.normal(module.weight, mean=0.0, std=0.02)
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal(module.weight, mean=0.0, std=0.02)
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward(self, idx, targets=None):
         B,T = idx.shape
