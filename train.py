@@ -33,7 +33,7 @@ from data.load import get_data_batch
 batch_size = 12
 max_iters = 600000 # maximum number of training iters
 
-should_estimate_loss = False # useful to turn this off if optimizing or debugging the main training loop
+should_estimate_loss = True # useful to turn this off if optimizing or debugging the main training loop
 eval_interval = 1000 # every num training iters we print estimated loss at
 eval_iters = 200 # number of training and val data samples we estimate loss over
 
