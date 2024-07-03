@@ -33,6 +33,13 @@ You can train the model by calling:
 python3 ./train.py
 ```
 
+Or with DDP (if you have multiple GPUs - highly suggested):
+
+```
+# DDP on 4 gpus on 1 node (for example)
+torchrun --standalone --nproc_per_node=4 train.py
+```
+
 Note that this, by default, loads the training checkpoint located in
 `out/*.pt`. If there is no training checkpoint, it starts training the model
 from scratch.

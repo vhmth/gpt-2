@@ -5,13 +5,11 @@ data splits. You can do this by running:
 # NOTE: this takes a while and downloads ~80GB of data!
 $ python3 ./data/prepare.py
 
-Then you can run this file:
+Then you can run this file (for a single GPU or CPU):
 $ python3 ./train.py
 
-TODOS:
-
-- log to wandb or neptune
-- lightning litgpt optimizations
+Or with DDP on 4 gpus on 1 node (for example):
+$ torchrun --standalone --nproc_per_node=4 train.py
 """
 
 import math
@@ -23,6 +21,7 @@ from pprint import pprint
 
 import torch
 import torch.nn as nn
+from torch.distributed import init_process_group, destroy_process_group
 from tqdm import tqdm
 
 from checkpoint.checkpoint import get_and_load_training_checkpoint, training_checkpoint
@@ -44,7 +43,6 @@ lr_decay_iters = 600000
 decay_lr = True # whether to decay the learning rate
 adamw_betas = (0.9, 0.95) # from GPT-3
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
 init_from = "scratch"
 out_dir = 'out'
 chkpt_file = training_checkpoint
@@ -55,6 +53,33 @@ chkpt_file = training_checkpoint
 compile = sys.version_info[0] < 3 or sys.version_info[1] < 12
 # -------------
 
+# set up DDP (distributed data parallel)
+# torchrun command sets the env variables RANK, LOCAL_RANK, and WORLD_SIZE
+ddp = int(os.environ.get('RANK', -1)) != -1 # is this a ddp run?
+if ddp:
+    # use of ddp demands CUDA, we set the device appropriately according to rank
+    assert torch.cuda.is_available(), "we need CUDA for DDP"
+    init_process_group(backend='nccl')
+    ddp_rank = int(os.environ['RANK'])
+    ddp_local_rank = int(os.environ['LOCAL_RANK'])
+    ddp_world_size = int(os.environ['WORLD_SIZE'])
+    device = f"cuda:{ddp_local_rank}"
+    torch.cuda.set_device(device)
+    master_process = ddp_rank == 0 # this process will do logging, checkpointing, etc.
+else:
+    # vanilla, non-DDP run
+    ddp_rank = 0
+    ddp_local_rank = 0
+    ddp_world_size = 1
+    master_process = True
+    # attempt to auto-detect
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"using device: {device}")
+
+def print_if_master(arg):
+    if master_process:
+        print(arg)
+
 # for GPU hardware that can support it, set matmul precision to "high"
 # so we can take advantage of lower-precision tf32 for more throughput
 torch.set_float32_matmul_precision('high')
@@ -62,16 +87,22 @@ torch.set_float32_matmul_precision('high')
 # load the model
 # load vocab_size to nearest divisibility of 2 to speed up token throughput on GPU
 gpt_config = GPTConfig(device=device, vocab_size=50304)
+block_size = gpt_config.block_size
 pprint(asdict(gpt_config), sort_dicts=False)
+
 model = GPT(gpt_config)
 model.to(device)
 
 # gradient accumulation calculations
 total_batch_size = 524288 # 2^19, ~0.5M tokens (following GPT-3 paper)
-assert total_batch_size % (batch_size * gpt_config.block_size) == 0, "make sure total_batch_size is divisible by B * T"
-grad_accum_steps = total_batch_size // (batch_size * gpt_config.block_size)
-print(f"total desired batch size: {total_batch_size}")
-print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
+assert total_batch_size % (batch_size * block_size * ddp_world_size) == 0, "make sure total_batch_size is divisible by B * T * ddp_world_size"
+grad_accum_steps = total_batch_size // (batch_size * block_size * ddp_world_size)
+print_if_master(f"total desired batch size: {total_batch_size}")
+print_if_master(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
+
+print("I am GPU", ddp_rank)
+print("Bye")
+import sys; sys.exit()
 
 # create optimizer
 # according to the GPT-1 paper:
@@ -132,7 +163,7 @@ def estimate_loss():
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters)
         for k in tqdm(range(eval_iters), desc=f"estimating {split} loss over {eval_iters} iters", leave=False):
-            x, y = get_data_batch(split, gpt_config.block_size, batch_size, device)
+            x, y = get_data_batch(split, block_size, batch_size, device)
             logits, loss = model(x, y)
             losses[k] = loss.item()
         out[split] = losses.mean()
@@ -182,7 +213,7 @@ for iter in range(curr_epoch, max_iters):
     # gradient accumulation
     loss_accum = 0.0
     for micro_step in range(grad_accum_steps):
-        xb, yb = get_data_batch("train", gpt_config.block_size, batch_size, device)
+        xb, yb = get_data_batch("train", block_size, batch_size, device)
         # used mixed precision autocasting to speed up GPU throughput
         with torch.autocast(device_type=device, dtype=torch.bfloat16):
             # evaluate the loss
@@ -197,6 +228,6 @@ for iter in range(curr_epoch, max_iters):
     torch.cuda.synchronize() # wait for GPU to finish work before taking time
     t1 = time.time()
     dt = t1 - t0
-    tokens_processed = batch_size * gpt_config.block_size * grad_accum_steps
+    tokens_processed = batch_size * block_size * grad_accum_steps
     tokens_per_sec = tokens_processed / dt
     print(f"step {iter:5d} | loss: {loss_accum.item():.6f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec:.2f}")
