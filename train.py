@@ -56,6 +56,10 @@ chkpt_file = training_checkpoint
 compile = False
 # -------------
 
+# for GPU hardware that can support it, set matmul precision to "high"
+# so we can take advantage of lower-precision tf32 for more throughput
+torch.set_float32_matmul_precision('high')
+
 # load the model
 gpt_config = GPTConfig(device=device)
 pprint(asdict(gpt_config), sort_dicts=False)
