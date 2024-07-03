@@ -149,7 +149,7 @@ def get_lr(it):
     return min_lr + coeff * (learning_rate - min_lr)
 
 # training loop
-for iter in tqdm(range(curr_epoch, max_iters), desc=f"training GPT {max_iters} epochs"):
+for iter in range(curr_epoch, max_iters):
     # determine and set the learning rate for this iteration
     lr = get_lr(iter) if decay_lr else learning_rate
     for param_group in optimizer.param_groups:
