@@ -15,7 +15,7 @@ import torch
 # note that the -X part of the committed checkpoint correlates
 # with how many epochs we've trained the model
 committed_checkpoint = os.path.join(os.path.dirname(__file__), 'chckpt-75k.pt')
-training_checkpoint = os.path.join(os.path.dirname(__file__), '..', 'chckpt.pt')
+training_checkpoint = os.path.join(os.path.dirname(__file__), '../out/', 'chckpt.pt')
 
 def get_checkpoint(chkpt_file, device):
     print(f"loading checkpoint from {chkpt_file}")
