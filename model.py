@@ -161,6 +161,19 @@ class GPT(nn.Module):
         # works. I need to read the paper.
         self.token_embedding_table.weight = self.lm_head.weight
 
+        # normalize weights with a std of 0.02 (per gpt-2 paper)
+        # note that this is roughly (but not exactly) equivalent to initializing
+        # to the sqrt(fan_in)
+        self.apply(self.__init_weights)
+
+    def __init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal(module.weight, mean=0.0, std=0.02)
+
     def forward(self, idx, targets=None):
         B,T = idx.shape
 
