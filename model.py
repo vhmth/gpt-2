@@ -152,6 +152,15 @@ class GPT(nn.Module):
         self.lm_head = nn.Linear(n_embd, vocab_size)
         self.ln_f = nn.LayerNorm(n_embd, bias=bias) # final layer norm
 
+        # weight sharing between the position embedding and language model head
+        # ^ used in attention is all you need paper (section 3.4)
+        #
+        # personally, I still don't understand why this is better. semantically, I
+        # guess the output of the head will encode the same information about a given
+        # token as the token embedding table, but it's interesting that it actually
+        # works. I need to read the paper.
+        self.token_embedding_table.weight = self.lm_head.weight
+
     def forward(self, idx, targets=None):
         B,T = idx.shape
 
