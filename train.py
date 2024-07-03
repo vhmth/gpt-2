@@ -30,7 +30,7 @@ from model import GPTConfig, GPT
 from data.load import get_data_batch
 
 # hyperparameters
-batch_size = 12
+batch_size = 20
 max_iters = 600000 # maximum number of training iters
 
 should_estimate_loss = True # useful to turn this off if optimizing or debugging the main training loop
