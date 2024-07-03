@@ -43,7 +43,6 @@ min_lr = 6e-5 # (10% of max learning rate per GPT-3 paper)
 lr_decay_iters = 600000
 decay_lr = True # whether to decay the learning rate
 adamw_betas = (0.9, 0.95) # from GPT-3
-adamw_eps = 1e-8 # from GPT-3
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 init_from = "scratch"
@@ -84,7 +83,7 @@ model.to(device)
 parameters = [p for p in list(model.parameters()) if p.requires_grad is True]
 num_params = sum(p.numel() for p in parameters)
 print(f"number of parameters: {num_params}")
-optimizer = torch.optim.AdamW(parameters, lr=learning_rate, betas=adamw_betas, eps=adamw_eps)
+optimizer = model.module.configure_optimizers(weight_decay=0.1, learning_rate=learning_rate, betas=adamw_betas, device=device)
 
 # handle checkpoints - for more info:
 # https://pytorch.org/tutorials/recipes/recipes/saving_and_loading_a_general_checkpoint.html
