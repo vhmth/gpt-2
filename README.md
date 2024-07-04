@@ -1,9 +1,9 @@
 # GPT-2
 
-Recreating gpt-2 from scratch. This is from Andrej Karpathy's [final YT video](https://www.youtube.com/watch?v=l8pRSuU81PU&ab_channel=AndrejKarpathy)
-in the Zero to Hero Deep Learning series. Instead of following along with the video,
-I am going to attempt to build the model from scratch by only reading the GPT-2
-and GPT-1 papers and figuring stuff out on my own.
+Recreating gpt-2 on my own, at first, and then pulling in optimizations from Andrej Karpathy's
+[final YT video](https://www.youtube.com/watch?v=l8pRSuU81PU&ab_channel=AndrejKarpathy)
+in the Zero to Hero Deep Learning series (from commit `cc0a0c606d6c8de9a7cb4c0e7751d1d38c318563`
+onwards).
 
 ## Setup
 
