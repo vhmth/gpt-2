@@ -21,7 +21,11 @@ from pprint import pprint
 
 import torch
 import torch.nn as nn
+
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
+import torch.distributed as dist
+
 from tqdm import tqdm
 
 from checkpoint.checkpoint import get_and_load_training_checkpoint, training_checkpoint
@@ -43,6 +47,7 @@ lr_decay_iters = 600000
 decay_lr = True # whether to decay the learning rate
 adamw_betas = (0.9, 0.95) # from GPT-3
 
+use_checkpoint = False # TODO: turn this back on after getting DDP right
 init_from = "scratch"
 out_dir = 'out'
 chkpt_file = training_checkpoint
@@ -64,6 +69,7 @@ if ddp:
     ddp_local_rank = int(os.environ['LOCAL_RANK'])
     ddp_world_size = int(os.environ['WORLD_SIZE'])
     device = f"cuda:{ddp_local_rank}"
+    device_type = 'cuda'
     torch.cuda.set_device(device)
     master_process = ddp_rank == 0 # this process will do logging, checkpointing, etc.
 else:
@@ -74,6 +80,7 @@ else:
     master_process = True
     # attempt to auto-detect
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device_type = device
     print(f"using device: {device}")
 
 def print_if_master(arg):
@@ -88,10 +95,17 @@ torch.set_float32_matmul_precision('high')
 # load vocab_size to nearest divisibility of 2 to speed up token throughput on GPU
 gpt_config = GPTConfig(device=device, vocab_size=50304)
 block_size = gpt_config.block_size
-pprint(asdict(gpt_config), sort_dicts=False)
+if master_process:
+    pprint(asdict(gpt_config), sort_dicts=False)
 
 model = GPT(gpt_config)
 model.to(device)
+if compile:
+    print("compiling model")
+    model = torch.compile(model)
+if ddp:
+    model = DDP(model, device_ids=[ddp_local_rank])
+raw_model = model.module if ddp else model # always contains the "raw" unwrapped model
 
 # gradient accumulation calculations
 total_batch_size = 524288 # 2^19, ~0.5M tokens (following GPT-3 paper)
@@ -99,10 +113,6 @@ assert total_batch_size % (batch_size * block_size * ddp_world_size) == 0, "make
 grad_accum_steps = total_batch_size // (batch_size * block_size * ddp_world_size)
 print_if_master(f"total desired batch size: {total_batch_size}")
 print_if_master(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
-
-print("I am GPU", ddp_rank)
-print("Bye")
-import sys; sys.exit()
 
 # create optimizer
 # according to the GPT-1 paper:
@@ -120,14 +130,14 @@ import sys; sys.exit()
 # more on AdamW here: https://arxiv.org/pdf/1711.05101
 parameters = [p for p in list(model.parameters()) if p.requires_grad is True]
 num_params = sum(p.numel() for p in parameters)
-print(f"number of parameters: {num_params}")
-optimizer = model.configure_optimizers(weight_decay=0.1, learning_rate=learning_rate, betas=adamw_betas, device=device)
+print_if_master(f"number of parameters: {num_params}")
+optimizer = raw_model.configure_optimizers(weight_decay=0.1, learning_rate=learning_rate, betas=adamw_betas, device=device)
 
 # handle checkpoints - for more info:
 # https://pytorch.org/tutorials/recipes/recipes/saving_and_loading_a_general_checkpoint.html
 os.makedirs(out_dir, exist_ok=True)
 
-if init_from == "scratch" and os.path.exists(chkpt_file):
+if use_checkpoint and init_from == "scratch" and os.path.exists(chkpt_file):
     replace_checkpoint = input(f"""
         Checkpoint file exists at {chkpt_file}.
         Do you want to train the model from scratch and replace the checkpoint?
@@ -147,14 +157,10 @@ if init_from == "scratch" and os.path.exists(chkpt_file):
 
 curr_epoch = 0
 best_val_loss = None
-if init_from == "resume":
+if use_checkpoint and init_from == "resume":
     checkpoint = get_and_load_training_checkpoint(model, optimizer, device)
     curr_epoch = checkpoint['curr_epoch']
     best_val_loss = checkpoint['best_val_loss']
-
-if compile:
-    print("compiling model")
-    model = torch.compile(model)
 
 @torch.no_grad()
 def estimate_loss():
@@ -162,7 +168,8 @@ def estimate_loss():
     model.eval()
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters)
-        for k in tqdm(range(eval_iters), desc=f"estimating {split} loss over {eval_iters} iters", leave=False):
+        print(f"estimating {split} loss over {eval_iters} iters")
+        for k in range(eval_iters):
             x, y = get_data_batch(split, block_size, batch_size, device)
             logits, loss = model(x, y)
             losses[k] = loss.item()
@@ -192,20 +199,22 @@ for iter in range(curr_epoch, max_iters):
         param_group['lr'] = lr
 
     # every once in a while evaluate the loss on train and val sets
-    if should_estimate_loss and iter % eval_interval == 0:
+    if should_estimate_loss and master_process and iter % eval_interval == 0:
         losses = estimate_loss()
         print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}, lr {lr}")
 
         best_val_loss = losses['val'] if best_val_loss is None else min(losses['val'], best_val_loss)
         curr_epoch = iter
-        checkpoint = {
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'best_val_loss': best_val_loss,
-            'curr_epoch': curr_epoch
-        }
-        print(f"saving checkpoint to {chkpt_file}...")
-        torch.save(checkpoint, chkpt_file)
+
+        if use_checkpoint:
+            checkpoint = {
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'best_val_loss': best_val_loss,
+                'curr_epoch': curr_epoch
+            }
+            print(f"saving checkpoint to {chkpt_file}...")
+            torch.save(checkpoint, chkpt_file)
 
     t0 = time.time()
     optimizer.zero_grad(set_to_none=True)
@@ -215,19 +224,29 @@ for iter in range(curr_epoch, max_iters):
     for micro_step in range(grad_accum_steps):
         xb, yb = get_data_batch("train", block_size, batch_size, device)
         # used mixed precision autocasting to speed up GPU throughput
-        with torch.autocast(device_type=device, dtype=torch.bfloat16):
+        with torch.autocast(device_type=device_type, dtype=torch.bfloat16):
             # evaluate the loss
             logits, loss = model(xb, yb)
         loss = loss / grad_accum_steps # scale the loss to account for gradient accumluation
         loss_accum += loss.detach()
+
+        # hacky way to allreduce the loss without having to duplicate
+        # code and use a context manager
+        if ddp:
+            model.require_backward_grad_sync = (micro_step == (grad_accum_steps - 1))
+
         loss.backward()
-        optimizer.step()
+    if ddp:
+        dist.all_reduce(loss_accum, op=dist.ReduceOp.AVG)
 
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0) # prevent the model from getting gradient shocks
-
+    optimizer.step()
     torch.cuda.synchronize() # wait for GPU to finish work before taking time
     t1 = time.time()
     dt = t1 - t0
-    tokens_processed = batch_size * block_size * grad_accum_steps
+    tokens_processed = batch_size * block_size * grad_accum_steps * ddp_world_size
     tokens_per_sec = tokens_processed / dt
-    print(f"step {iter:5d} | loss: {loss_accum.item():.6f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec:.2f}")
+    print_if_master(f"step {iter:5d} | loss: {loss_accum.item():.6f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec:.2f}")
+
+if ddp:
+    destroy_process_group()
