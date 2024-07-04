@@ -134,7 +134,9 @@ class Block(nn.Module):
 class GPTConfig:
     device: str = "cpu" # cpu or cuda
     block_size: int = 1024 # context length
-    vocab_size: int = 50257
+    # load vocab_size to nearest divisibility of 2 to speed up token throughput on GPU
+    # actual vocab_size is 50257
+    vocab_size: int = 50304
     n_layer: int = 12
     n_head: int = 12
     n_embd: int = 768

@@ -27,7 +27,7 @@ model.to(device)
 
 chkpt_file = os.path.join('out', 'chckpt.pt')
 
-checkpoint = get_and_load_committed_checkpoint(model, device=device)
+checkpoint = get_and_load_committed_checkpoint(model, device=device, unwanted_prefix='module._orig_mod.')
 
 if checkpoint == None:
     print("no checkpoint file found, loading untrained model")
@@ -42,4 +42,5 @@ else:
     context = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
 
 with torch.no_grad():
-    print(enc.decode(model.generate(context, max_new_tokens=100)[0].tolist()))
+    with torch.autocast(device_type=device, dtype=torch.bfloat16):
+        print(enc.decode(model.generate(context, max_new_tokens=100)[0].tolist()))

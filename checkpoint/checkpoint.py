@@ -28,12 +28,19 @@ def get_checkpoint(chkpt_file, device):
     # and that you want to load on the same machine with GPUs
     return torch.load(chkpt_file)
 
-def get_and_load_checkpoint(chkpt_file, model, optimizer = None, device = None):
+def get_and_load_checkpoint(chkpt_file, model, optimizer = None, device = None, unwanted_prefix = None):
     if not os.path.exists(chkpt_file):
         return None
 
     checkpoint = get_checkpoint(chkpt_file, device)
-    model.load_state_dict(checkpoint['model_state_dict'])
+
+    state_dict = checkpoint['model_state_dict']
+    if unwanted_prefix is not None:
+        for k,v in list(state_dict.items()):
+            if k.startswith(unwanted_prefix):
+                state_dict[k[len(unwanted_prefix):]] = state_dict.pop(k)
+
+    model.load_state_dict(state_dict)
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     
@@ -43,8 +50,8 @@ def get_and_load_checkpoint(chkpt_file, model, optimizer = None, device = None):
     
     return checkpoint
 
-def get_and_load_committed_checkpoint(model, optimizer = None, device = None):
-    return get_and_load_checkpoint(committed_checkpoint, model, optimizer, device)
+def get_and_load_committed_checkpoint(model, optimizer = None, device = None, unwanted_prefix = None):
+    return get_and_load_checkpoint(committed_checkpoint, model, optimizer, device, unwanted_prefix)
 
-def get_and_load_training_checkpoint(model, optimizer = None, device = None):
-    return get_and_load_checkpoint(training_checkpoint, model, optimizer, device)
+def get_and_load_training_checkpoint(model, optimizer = None, device = None, unwanted_prefix = None):
+    return get_and_load_checkpoint(training_checkpoint, model, optimizer, device, modify_state_dict, unwanted_prefix)

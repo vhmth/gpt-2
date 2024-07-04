@@ -92,8 +92,7 @@ def print_if_master(arg):
 torch.set_float32_matmul_precision('high')
 
 # load the model
-# load vocab_size to nearest divisibility of 2 to speed up token throughput on GPU
-gpt_config = GPTConfig(device=device, vocab_size=50304)
+gpt_config = GPTConfig(device=device)
 block_size = gpt_config.block_size
 if master_process:
     pprint(asdict(gpt_config), sort_dicts=False)
