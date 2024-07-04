@@ -153,7 +153,8 @@ def estimate_loss():
         print(f"estimating {split} loss over {eval_iters} iters")
         for k in range(eval_iters):
             x, y = get_data_batch(split, block_size, batch_size, device)
-            logits, loss = model(x, y)
+            with torch.autocast(device_type=device_type, dtype=torch.bfloat16):
+                logits, loss = model(x, y)
             losses[k] = loss.item()
         out[split] = losses.mean()
     model.train()
