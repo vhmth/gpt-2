@@ -54,4 +54,4 @@ def get_and_load_committed_checkpoint(model, optimizer = None, device = None, un
     return get_and_load_checkpoint(committed_checkpoint, model, optimizer, device, unwanted_prefix)
 
 def get_and_load_training_checkpoint(model, optimizer = None, device = None, unwanted_prefix = None):
-    return get_and_load_checkpoint(training_checkpoint, model, optimizer, device, modify_state_dict, unwanted_prefix)
+    return get_and_load_checkpoint(training_checkpoint, model, optimizer, device, unwanted_prefix)
