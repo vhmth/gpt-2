@@ -49,7 +49,14 @@ from scratch.
 Sample from the model by calling:
 
 ```
+# with no prompt and default max tokens
 python3 ./sample.py
+
+# with a prompt
+python3 ./sample.py -p "Hello, I'm a language model,"
+
+# with a prompt and setting the maximum tokens to 500
+python3 ./sample.py -p "Hello, I'm a language model," -m 500
 ```
 
 Note that this, by default, loads the committed checkpoint located in
