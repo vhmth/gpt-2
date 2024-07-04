@@ -47,8 +47,8 @@ lr_decay_iters = 600000
 decay_lr = True # whether to decay the learning rate
 adamw_betas = (0.9, 0.95) # from GPT-3
 
-use_checkpoint = False # TODO: turn this back on after getting DDP right
-init_from = "scratch"
+use_checkpoint = True
+init_from = "scratch" # change to "resume" to resume training from a checkpoint
 out_dir = 'out'
 chkpt_file = training_checkpoint
 
@@ -136,24 +136,6 @@ optimizer = raw_model.configure_optimizers(weight_decay=0.1, learning_rate=learn
 # handle checkpoints - for more info:
 # https://pytorch.org/tutorials/recipes/recipes/saving_and_loading_a_general_checkpoint.html
 os.makedirs(out_dir, exist_ok=True)
-
-if use_checkpoint and init_from == "scratch" and os.path.exists(chkpt_file):
-    replace_checkpoint = input(f"""
-        Checkpoint file exists at {chkpt_file}.
-        Do you want to train the model from scratch and replace the checkpoint?
-        If you do, respond with "y" or "yes":
-    """)
-
-    if replace_checkpoint.lower() not in ["y", "yes"]:
-        resume_from_checkpoint = input(f"""
-            Would you like to resume training from {chkpt_file}?
-            If you do, respond with "y" or "yes":
-        """)
-
-        if replace_checkpoint.lower() in ["y", "yes"]:
-            init_from = "resume"
-        else:
-            sys.exit()
 
 curr_epoch = 0
 best_val_loss = None
